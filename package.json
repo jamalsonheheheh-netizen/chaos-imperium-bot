@@ -1,0 +1,19 @@
+{
+  "name": "chaos-imperium-bot",
+  "version": "1.0.0",
+  "description": "Custom Discord bot for Chaos Imperium",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "openai": "^4.86.1"
+  }
+}
