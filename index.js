@@ -146,7 +146,7 @@ async function biblicalAI(message, prompt, longMode = false) {
     ? 'You may give a fuller response, usually 2-5 short paragraphs.'
     : 'Keep the answer concise, usually 1-4 sentences.';
 
-  const system = `You are the Chaos Imperium Scripture-style assistant. Speak in a solemn, wise, biblical cadence inspired by old scripture, but do not falsely claim that your own words are Bible verses. ${lengthRule} Be respectful and clear. If quoting scripture, keep quotations brief and cite the book/chapter/verse when confident. Never fabricate a verse or citation. Do not imitate a specific modern copyrighted Bible translation word-for-word.`;
+  const system = `You are the voice of Chaos Imperium. Speak in a solemn, elevated, biblical cadence resembling archaic English: use natural words such as thou, thee, thy, thine, hath, hast, shalt, dost, art, unto, behold, therefore, and verily when they fit. The desired feel is like: "Thy word is a lamp unto my feet, and a light unto my path." Do not overuse archaic words or become difficult to understand. ${lengthRule} Answer the user's actual question directly. Never claim that words you generated are a real Bible verse. If you quote Scripture, clearly identify it as Scripture and cite the book, chapter, and verse only when confident. Never fabricate a verse or citation.`;
 
   const response = await openai.responses.create({
     model: 'gpt-5-mini',
@@ -174,14 +174,57 @@ client.once(Events.ClientReady, readyClient => {
 });
 
 client.on(Events.MessageCreate, async message => {
-  if (message.author.bot || !message.content.startsWith(PREFIX)) return;
-
-  const body = message.content.slice(PREFIX.length).trim();
-  if (!body) return;
-  const [commandRaw, ...args] = body.split(/\s+/);
-  const command = commandRaw.toLowerCase();
+  if (message.author.bot) return;
 
   try {
+    // AI activates naturally when Chaos Imperium is pinged or replied to.
+    const mentionedBot = Boolean(client.user && message.mentions.has(client.user));
+
+    let repliedToBot = false;
+    if (message.reference?.messageId) {
+      try {
+        const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
+        repliedToBot = repliedMessage.author.id === client.user?.id;
+      } catch {
+        // Ignore deleted/unavailable referenced messages.
+      }
+    }
+
+    if (mentionedBot || repliedToBot) {
+      let prompt = message.content;
+
+      if (client.user) {
+        prompt = prompt
+          .replaceAll(`<@${client.user.id}>`, '')
+          .replaceAll(`<@!${client.user.id}>`, '')
+          .trim();
+      }
+
+      if (!prompt && repliedToBot && message.reference?.messageId) {
+        prompt = 'Continue the conversation according to the message I replied to.';
+      }
+
+      if (!prompt) {
+        await message.reply('Speak, and I shall answer thee.');
+        return;
+      }
+
+      const manager = isManager(message.member);
+      const asksForLong = /\b(long|longer|detailed|detail|explain fully|full explanation|in depth|deep explanation)\b/i.test(prompt);
+      const longMode = manager && asksForLong;
+
+      await biblicalAI(message, prompt, longMode);
+      return;
+    }
+
+    // Everything below remains prefix-command based.
+    if (!message.content.startsWith(PREFIX)) return;
+
+    const body = message.content.slice(PREFIX.length).trim();
+    if (!body) return;
+    const [commandRaw, ...args] = body.split(/\s+/);
+    const command = commandRaw.toLowerCase();
+
     if (command === 'info') {
       const banner = asset('info-banner.png');
       const logo = asset('chaos-imperium-logo.png');
@@ -214,30 +257,6 @@ client.on(Events.MessageCreate, async message => {
         .setDescription('Your message is ready. Select how Chaos Imperium should present it.');
 
       await message.reply({ embeds: [picker], components: [announcementTypeButtons(message.author.id)] });
-      return;
-    }
-
-    if (command === 'ask' || command === 'ai') {
-      const prompt = args.join(' ').trim();
-      if (!prompt) {
-        await message.reply(`Usage: \`${PREFIX}ask [question]\``);
-        return;
-      }
-      await biblicalAI(message, prompt, false);
-      return;
-    }
-
-    if (command === 'asklong' || command === 'ailong') {
-      if (!isManager(message.member)) {
-        await message.reply('Extended AI answers require **Manage Server** permission or higher.');
-        return;
-      }
-      const prompt = args.join(' ').trim();
-      if (!prompt) {
-        await message.reply(`Usage: \`${PREFIX}asklong [question]\``);
-        return;
-      }
-      await biblicalAI(message, prompt, true);
       return;
     }
 
